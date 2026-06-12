@@ -1,0 +1,8 @@
+name: navreport — Multi-Level Navigation Dashboard
+description: >
+  Creates an HTML report with an unlimited-depth sidebar navigation,
+  lazy-loaded interactive charts (highcharter, plotly, ggplot2, echarts4r),
+  KPI cards, callout boxes, and chart picker dropdowns.
+  Charts are deferred until the user navigates to their page, enabling
+  documents with hundreds of charts to open in under 10 seconds.
+create_dir: false

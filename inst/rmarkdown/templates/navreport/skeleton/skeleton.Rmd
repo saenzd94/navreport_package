@@ -1,0 +1,566 @@
+---
+title: "Mi Reporte Interactivo"
+subtitle: "Template navreport con navegación multinivel"
+author: "Autor del Reporte"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  navreport::navreport_html:
+    theme: navy_teal          # opciones: navy_teal | dark | light | academic | corporate
+    self_contained: true      # false = archivo más liviano, requiere conexión a internet
+    mathjax: "cdn"            # "cdn" | NULL para desactivar
+    sidebar_width: 260        # ancho de la barra lateral en píxeles
+    # primary_color: "#0F1C35"   # descomente para sobreescribir colores del tema
+    # accent_color:  "#0D9488"
+---
+
+```{r setup, include=FALSE}
+# ══════════════════════════════════════════════════════════════════════════════
+#  CHUNK DE SETUP  —  NO ELIMINAR
+#  Cargue aquí todos sus paquetes y defina datos globales.
+# ══════════════════════════════════════════════════════════════════════════════
+knitr::opts_chunk$set(
+  echo    = FALSE,   # cambiar a TRUE si desea mostrar código
+  message = FALSE,
+  warning = FALSE,
+  results = "asis"   # necesario para fn_page() y fn_nav()
+)
+
+library(navreport)   # <-- el paquete que provee las funciones fn_*
+
+# Paquetes de gráficos (instale los que use)
+if (requireNamespace("highcharter", quietly = TRUE)) library(highcharter)
+if (requireNamespace("plotly",      quietly = TRUE)) library(plotly)
+if (requireNamespace("ggplot2",     quietly = TRUE)) library(ggplot2)
+if (requireNamespace("dplyr",       quietly = TRUE)) library(dplyr)
+
+# ── Datos de ejemplo ──────────────────────────────────────────────────────
+set.seed(42)
+ventas <- data.frame(
+  mes      = month.abb,
+  region_a = round(runif(12, 80, 200)),
+  region_b = round(runif(12, 60, 180)),
+  region_c = round(runif(12, 40, 140))
+)
+```
+
+```{r nav-config}
+# ══════════════════════════════════════════════════════════════════════════════
+#  DEFINICIÓN DE LA NAVEGACIÓN
+#
+#  Estructura:
+#   fn_nav(
+#     fn_menu("Etiqueta menú",
+#       fn_submenu("Etiqueta submenú",
+#         fn_item("Etiqueta página", "id_pagina"),
+#         fn_item("Otra página",    "otro_id")
+#       ),
+#       fn_item("Página directa bajo menú", "id_directo")   # sin submenú
+#     ),
+#     fn_menu("Otro menú",
+#       fn_submenu("Sub A", fn_item("Pág 1", "p_a1"), fn_item("Pág 2", "p_a2")),
+#       fn_submenu("Sub B",
+#         fn_submenu("Sub B1",   # ← submenú dentro de submenú (sin límite de niveles)
+#           fn_item("Pág B1a", "p_b1a")
+#         )
+#       )
+#     ),
+#     title     = "Nombre en la barra lateral",
+#     subtitle  = "Subtítulo opcional",
+#     first_page = "p_resumen"   # página que se muestra al abrir
+#   )
+# ══════════════════════════════════════════════════════════════════════════════
+fn_nav(
+  # ── MENÚ 1 ────────────────────────────────────────────────────────────────
+  fn_menu("📊 Ventas",
+    fn_submenu("Resumen",
+      fn_item("Panel General",     "p_resumen"),
+      fn_item("KPIs del Período",  "p_kpis")
+    ),
+    fn_submenu("Por Región",
+      fn_item("Región A",  "p_reg_a"),
+      fn_item("Región B",  "p_reg_b"),
+      fn_item("Comparativa", "p_comparativa")
+    )
+  ),
+  # ── MENÚ 2 ────────────────────────────────────────────────────────────────
+  fn_menu("📈 Análisis",
+    fn_submenu("Estadísticos",
+      fn_item("Descriptivos",   "p_desc"),
+      fn_item("Distribuciones", "p_dist")
+    ),
+    fn_submenu("Modelos",
+      fn_submenu("Regresión",
+        fn_item("Lineal Simple",   "p_reg_lin"),
+        fn_item("Múltiple",        "p_reg_mult")
+      ),
+      fn_item("Series de Tiempo", "p_ts")
+    )
+  ),
+  # ── MENÚ 3 ────────────────────────────────────────────────────────────────
+  fn_menu("📝 Notas",
+    fn_item("Metodología", "p_metodologia"),
+    fn_item("Fórmulas",    "p_formulas")
+  ),
+
+  title      = "Mi Reporte",
+  subtitle   = "Análisis de Ventas 2024",
+  first_page = "p_resumen"
+)
+```
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PÁGINAS DE CONTENIDO
+     Cada fn_page("id") corresponde a un fn_item("label", "id") en la nav.
+     El orden aquí no importa; la navegación controla qué se muestra.
+     ════════════════════════════════════════════════════════════════════ -->
+
+<!-- ──────────────────────────────── PÁGINA: RESUMEN ──────────────────── -->
+```{r page-resumen}
+fn_page("p_resumen", title = "Panel General de Ventas",
+
+  # KPIs al inicio de la página
+  fn_kpi_row(
+    fn_kpi("Ventas Totales",  "₡4.2 M",   sub = "↑ 12% vs anterior", color = "accent"),
+    fn_kpi("Mejor Región",    "Región A",  sub = "₡1.9 M acumulado",  color = "gold"),
+    fn_kpi("Meses analizados","12",        sub = "Enero–Diciembre",   color = "default"),
+    fn_kpi("Meta alcanzada",  "87%",       sub = "3 regiones",        color = "green")
+  ),
+
+  # Texto descriptivo + gráfico combinados en una línea
+  fn_text_chart(
+    text = "## Evolución mensual de ventas
+
+Las ventas combinadas de las tres regiones muestran una tendencia
+**positiva** en el segundo semestre, con un pico notable en octubre.
+
+La *Región A* lidera el crecimiento acumulado, representando el
+**45%** de las ventas totales del período.",
+
+    chart = fn_hc(
+      highchart() %>%
+        hc_chart(type = "column") %>%
+        hc_title(text = "Ventas Mensuales por Región") %>%
+        hc_xAxis(categories = ventas$mes) %>%
+        hc_yAxis(title = list(text = "Miles de unidades")) %>%
+        hc_add_series(name = "Región A", data = ventas$region_a) %>%
+        hc_add_series(name = "Región B", data = ventas$region_b) %>%
+        hc_add_series(name = "Región C", data = ventas$region_c) %>%
+        hc_colors(c("#0D9488","#1D4ED8","#D97706")) %>%
+        hc_tooltip(shared = TRUE) %>%
+        hc_exporting(enabled = TRUE)
+    ),
+    layout     = "side",
+    text_width = "32%"
+  ),
+
+  fn_callout(
+    "La caída en marzo se asocia con el período de mantenimiento
+     preventivo anual de la planta principal. Se recomienda programar
+     una producción de respaldo para el próximo ejercicio.",
+    title = "Nota sobre marzo",
+    type  = "warning"
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: KPIs ──────────────────────── -->
+```{r page-kpis}
+fn_page("p_kpis", title = "KPIs del Período",
+
+  fn_text("## Indicadores clave de desempeño
+
+Los siguientes KPIs resumen el desempeño consolidado del período
+analizado. Cada métrica se calcula con base en los datos de ventas
+registrados en el sistema ERP."),
+
+  fn_kpi_row(
+    fn_kpi("CAGR Ventas",     "8.3%",    sub = "Últimos 3 años",     color = "accent"),
+    fn_kpi("Margen Bruto",    "34.1%",   sub = "↑ 1.2pp vs 2023",   color = "green"),
+    fn_kpi("Ticket Promedio", "₡18,400", sub = "por transacción",    color = "default"),
+    fn_kpi("NPS",             "72",      sub = "Zona de excelencia", color = "gold"),
+    fn_kpi("Retención",       "91%",     sub = "Clientes activos",   color = "green"),
+    fn_kpi("Devoluciones",    "1.8%",    sub = "↓ 0.4pp vs 2023",   color = "accent")
+  ),
+
+  # Picker: el usuario elige entre varios gráficos desde un desplegable
+  fn_chart_picker(
+    label   = "Visualizar:",
+    default = 1L,
+
+    "Tendencia acumulada" = fn_hc(
+      highchart() %>%
+        hc_chart(type = "area") %>%
+        hc_title(text = "Ventas Acumuladas") %>%
+        hc_xAxis(categories = ventas$mes) %>%
+        hc_add_series(
+          name = "Acumulado",
+          data = cumsum(ventas$region_a + ventas$region_b + ventas$region_c)
+        ) %>%
+        hc_colors(c("#0D9488")) %>%
+        hc_tooltip(valueDecimals = 0) %>%
+        hc_plotOptions(area = list(fillOpacity = 0.15))
+    ),
+
+    "Dispersión A vs B" = fn_hc(
+      highchart() %>%
+        hc_chart(type = "scatter") %>%
+        hc_title(text = "Correlación Región A vs B") %>%
+        hc_xAxis(title = list(text = "Región A")) %>%
+        hc_yAxis(title = list(text = "Región B")) %>%
+        hc_add_series(
+          name   = "Meses",
+          data   = lapply(seq_len(nrow(ventas)), function(i)
+                     list(ventas$region_a[i], ventas$region_b[i])),
+          tooltip = list(pointFormat = "A: {point.x} — B: {point.y}")
+        ) %>%
+        hc_colors(c("#7C3AED"))
+    ),
+
+    "Barras ggplot2" = fn_gg(
+      ggplot(
+        tidyr::pivot_longer(ventas, -mes, names_to="region", values_to="ventas") %>%
+          dplyr::group_by(region) %>%
+          dplyr::summarise(total = sum(ventas), .groups = "drop"),
+        aes(x = region, y = total, fill = region)
+      ) +
+        geom_col(width = 0.6) +
+        scale_fill_manual(values = c("#0D9488","#1D4ED8","#D97706")) +
+        labs(title = "Total por Región (ggplot2 → plotly)", x = NULL, y = "Ventas") +
+        theme_minimal(base_size = 13) +
+        theme(legend.position = "none")
+    )
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: REGIÓN A ──────────────────── -->
+```{r page-reg-a}
+fn_page("p_reg_a", title = "Región A — Detalle",
+
+  fn_text("## Análisis de la Región A
+
+La Región A concentra la mayor proporción de ventas históricas.
+Su desempeño es **consistente** y presenta la menor varianza
+trimestral entre las tres regiones analizadas."),
+
+  fn_hc(
+    highchart() %>%
+      hc_chart(type = "line") %>%
+      hc_title(text = "Ventas Mensuales — Región A") %>%
+      hc_xAxis(categories = ventas$mes) %>%
+      hc_add_series(name = "Ventas", data = ventas$region_a,
+                    marker = list(enabled = TRUE, radius = 5)) %>%
+      hc_colors(c("#0D9488")) %>%
+      hc_tooltip(valueDecimals = 0, valueSuffix = " un.") %>%
+      hc_annotations(list(
+        labels = list(list(
+          point = list(xAxis = 0, yAxis = 0,
+                       x = 9, y = max(ventas$region_a)),
+          text  = "Pico máximo"
+        ))
+      )),
+    height = "380px"
+  ),
+
+  fn_callout("El promedio mensual de Región A es ₡",
+             title = "Promedio", type = "info")
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: REGIÓN B ──────────────────── -->
+```{r page-reg-b}
+fn_page("p_reg_b", title = "Región B — Detalle",
+
+  fn_hc(
+    highchart() %>%
+      hc_chart(type = "column") %>%
+      hc_title(text = "Ventas Mensuales — Región B") %>%
+      hc_xAxis(categories = ventas$mes) %>%
+      hc_add_series(name = "Ventas", data = ventas$region_b,
+                    colorByPoint = TRUE) %>%
+      hc_tooltip(valueDecimals = 0) %>%
+      hc_exporting(enabled = TRUE)
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: COMPARATIVA ───────────────── -->
+```{r page-comparativa}
+fn_page("p_comparativa", title = "Comparativa de Regiones",
+
+  fn_chart_picker(
+    label   = "Tipo de gráfico:",
+    default = 1L,
+
+    "Barras agrupadas" = fn_hc(
+      highchart() %>%
+        hc_chart(type = "bar") %>%
+        hc_title(text = "Comparativa Regional — Barras") %>%
+        hc_xAxis(categories = ventas$mes) %>%
+        hc_add_series(name = "A", data = ventas$region_a) %>%
+        hc_add_series(name = "B", data = ventas$region_b) %>%
+        hc_add_series(name = "C", data = ventas$region_c) %>%
+        hc_colors(c("#0D9488","#1D4ED8","#D97706")) %>%
+        hc_tooltip(shared = TRUE)
+    ),
+
+    "Radar (spider)" = fn_hc({
+      q <- ventas[c(3,6,9,12), ]  # trimestres
+      highchart() %>%
+        hc_chart(polar = TRUE, type = "line") %>%
+        hc_title(text = "Ventas por Trimestre (Radar)") %>%
+        hc_xAxis(categories = c("Q1","Q2","Q3","Q4"), tickmarkPlacement = "on") %>%
+        hc_yAxis(gridLineInterpolation = "polygon", min = 0) %>%
+        hc_add_series(name = "Región A", data = q$region_a) %>%
+        hc_add_series(name = "Región B", data = q$region_b) %>%
+        hc_add_series(name = "Región C", data = q$region_c) %>%
+        hc_colors(c("#0D9488","#1D4ED8","#D97706")) %>%
+        hc_tooltip(shared = TRUE)
+    }),
+
+    "Heatmap" = fn_hc({
+      m <- as.matrix(ventas[, -1])
+      highchart() %>%
+        hc_chart(type = "heatmap") %>%
+        hc_title(text = "Mapa de calor mensual") %>%
+        hc_xAxis(categories = ventas$mes) %>%
+        hc_yAxis(categories = c("Región A","Región B","Región C"),
+                 reversed = TRUE) %>%
+        hc_add_series(
+          name = "Ventas",
+          data = lapply(1:3, function(r)
+            lapply(1:12, function(c) list(c - 1, r - 1, m[c, r]))) %>%
+            unlist(recursive = FALSE)
+        ) %>%
+        hc_colorAxis(min = 0, stops = color_stops(n = 5, colors = c("#EFF6FF","#0D9488"))) %>%
+        hc_tooltip(formatter = JS("function(){ return '<b>'+this.series.yAxis.categories[this.point.y]+'</b><br>'+this.series.xAxis.categories[this.point.x]+': '+this.point.value; }"))
+    })
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: DESCRIPTIVOS ─────────────── -->
+```{r page-desc}
+fn_page("p_desc", title = "Estadísticos Descriptivos",
+
+  fn_text("## Resumen estadístico
+
+La siguiente tabla muestra los principales estadísticos descriptivos
+calculados sobre la serie mensual de ventas de las tres regiones."),
+
+  # Tabla HTML básica (o use DT::datatable para tablas interactivas)
+  {
+    tab <- data.frame(
+      Estadístico = c("Media","Mediana","Desv. Est.","Mínimo","Máximo"),
+      `Región A`  = round(c(mean(ventas$region_a), median(ventas$region_a),
+                            sd(ventas$region_a), min(ventas$region_a),
+                            max(ventas$region_a)), 1),
+      `Región B`  = round(c(mean(ventas$region_b), median(ventas$region_b),
+                            sd(ventas$region_b), min(ventas$region_b),
+                            max(ventas$region_b)), 1),
+      `Región C`  = round(c(mean(ventas$region_c), median(ventas$region_c),
+                            sd(ventas$region_c), min(ventas$region_c),
+                            max(ventas$region_c)), 1),
+      check.names = FALSE
+    )
+    knitr::kable(tab, format = "html", table.attr = 'class="nr-table"')
+  }
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: DISTRIBUCIONES ───────────── -->
+```{r page-dist}
+fn_page("p_dist", title = "Distribuciones",
+
+  fn_text("## Distribución de ventas por región
+
+Los histogramas muestran la distribución empírica de las ventas
+mensuales. Use el selector para cambiar de región."),
+
+  fn_chart_picker(
+    label = "Región:",
+    "Región A" = fn_hc(
+      hchart(density(ventas$region_a), type = "area", name = "Región A",
+             color = "#0D9488") %>%
+        hc_title(text = "Densidad — Región A") %>%
+        hc_xAxis(title = list(text = "Ventas")) %>%
+        hc_plotOptions(area = list(fillOpacity = 0.2))
+    ),
+    "Región B" = fn_hc(
+      hchart(density(ventas$region_b), type = "area", name = "Región B",
+             color = "#1D4ED8") %>%
+        hc_title(text = "Densidad — Región B") %>%
+        hc_xAxis(title = list(text = "Ventas")) %>%
+        hc_plotOptions(area = list(fillOpacity = 0.2))
+    ),
+    "Región C" = fn_hc(
+      hchart(density(ventas$region_c), type = "area", name = "Región C",
+             color = "#D97706") %>%
+        hc_title(text = "Densidad — Región C") %>%
+        hc_xAxis(title = list(text = "Ventas")) %>%
+        hc_plotOptions(area = list(fillOpacity = 0.2))
+    )
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: REGRESIÓN LINEAL ──────────── -->
+```{r page-reg-lin}
+fn_page("p_reg_lin", title = "Regresión Lineal Simple",
+
+  fn_text("## Modelo de Regresión: Región A ~ Región B
+
+El modelo evalúa si las ventas de la Región B tienen poder predictivo
+sobre las ventas de la Región A."),
+
+  fn_text_chart(
+    text = "**Ecuación del modelo:**
+
+$$\\hat{Y}_A = \\beta_0 + \\beta_1 \\cdot X_B + \\varepsilon$$
+
+Los coeficientes estimados por mínimos cuadrados ordinarios
+indican una relación **positiva** entre las regiones.
+
+El coeficiente de determinación $R^2$ sugiere que las
+variaciones en Región B explican aproximadamente el
+**35%** de la varianza en Región A.",
+
+    chart = fn_gg({
+      ggplot(ventas, aes(x = region_b, y = region_a)) +
+        geom_point(color = "#0D9488", size = 3, alpha = .8) +
+        geom_smooth(method = "lm", color = "#1D4ED8", fill = "#EFF6FF", se = TRUE) +
+        labs(
+          title    = "Dispersión Región A vs Región B con línea de regresión",
+          subtitle = "Intervalo de confianza al 95%",
+          x        = "Ventas Región B",
+          y        = "Ventas Región A"
+        ) +
+        theme_minimal(base_size = 12) +
+        theme(plot.title = element_text(face = "bold", color = "#1B2A4A"))
+    }),
+    layout     = "side",
+    text_width = "38%"
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: REG. MÚLTIPLE ─────────────── -->
+```{r page-reg-mult}
+fn_page("p_reg_mult", title = "Regresión Múltiple",
+
+  fn_callout(
+    "La regresión múltiple agrega las tres regiones como predictores
+     para estimar un índice compuesto de demanda. Interprete los
+     coeficientes con precaución dada la posible colinealidad.",
+    title = "Nota metodológica",
+    type  = "info"
+  ),
+
+  fn_hc(
+    highchart() %>%
+      hc_chart(type = "scatter") %>%
+      hc_title(text = "Valores ajustados vs residuos") %>%
+      hc_xAxis(title = list(text = "Valores ajustados")) %>%
+      hc_yAxis(title = list(text = "Residuos"), plotLines = list(
+        list(value = 0, color = "#DC2626", width = 1.5, dashStyle = "dash")
+      )) %>%
+      hc_add_series(
+        name = "Residuos",
+        data = {
+          m    <- lm(region_a ~ region_b + region_c, data = ventas)
+          lapply(seq_along(fitted(m)), function(i)
+            list(x = round(fitted(m)[i], 1), y = round(residuals(m)[i], 1)))
+        },
+        marker = list(radius = 5)
+      ) %>%
+      hc_colors(c("#7C3AED")) %>%
+      hc_tooltip(pointFormat = "Ajustado: {point.x}<br>Residuo: {point.y}")
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: SERIES DE TIEMPO ──────────── -->
+```{r page-ts}
+fn_page("p_ts", title = "Serie de Tiempo",
+
+  fn_text("## Análisis de serie de tiempo — Ventas totales
+
+La serie de ventas totales (suma de las tres regiones) se descompone
+en tendencia, estacionalidad y componente irregular."),
+
+  fn_hc(
+    highchart(type = "stock") %>%
+      hc_title(text = "Ventas Totales — Vista Stock") %>%
+      hc_add_series(
+        name = "Total",
+        data = xts::xts(
+          rowSums(ventas[, -1]),
+          order.by = as.Date(paste0("2024-", sprintf("%02d", 1:12), "-01"))
+        )
+      ) %>%
+      hc_colors(c("#0D9488")) %>%
+      hc_rangeSelector(selected = 4) %>%
+      hc_tooltip(valueDecimals = 0),
+    height = "420px"
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: METODOLOGÍA ───────────────── -->
+```{r page-metodologia}
+fn_page("p_metodologia", title = "Metodología",
+
+  fn_text("## Fuentes de datos y metodología
+
+Los datos provienen del sistema ERP corporativo, consultados mediante
+la API de reportes con corte al **31 de diciembre de 2024**.
+
+### Proceso de limpieza
+- Se eliminaron registros duplicados (< 0.3% del total).
+- Los valores atípicos se trataron mediante la regla de Tukey
+  ($1.5 \\cdot IQR$).
+- Las series se deflactaron usando el índice de precios al consumidor
+  publicado por el BCCR.
+
+### Herramientas utilizadas
+- **R** 4.3.2 con paquetes `highcharter`, `ggplot2`, `dplyr`.
+- Template `navreport` para la generación del reporte HTML.
+- Control de versiones en **GitHub**."),
+
+  fn_callout(
+    "El reporte se actualiza automáticamente al ejecutar el botón
+     'Knit' en RStudio. No requiere exportar datos manualmente.",
+    title = "Actualización automática",
+    type  = "success"
+  )
+)
+```
+
+<!-- ──────────────────────────────── PÁGINA: FÓRMULAS ─────────────────── -->
+```{r page-formulas}
+fn_page("p_formulas", title = "Fórmulas y Notación",
+
+  fn_text("## Notación matemática
+
+Este template soporta **LaTeX** a través de MathJax. Puede incluir
+ecuaciones en línea como $\\mu = \\frac{1}{n}\\sum x_i$ o en bloque:"),
+
+  fn_text("$$\\text{VPN} = \\sum_{t=1}^{T} \\frac{CF_t}{(1+r)^t} - I_0$$
+
+El Valor Presente Neto compara los flujos de caja descontados
+con la inversión inicial $I_0$.
+
+$$\\varphi_i(v) = \\sum_{S \\subseteq N\\setminus\\{i\\}}
+\\frac{|S|!(n-|S|-1)!}{n!}\\left[v(S\\cup\\{i\\})-v(S)\\right]$$
+
+La fórmula anterior corresponde al **Valor de Shapley** de la
+teoría de juegos cooperativa."),
+
+  fn_callout(
+    "Para insertar una ecuación use: $expresión$ (en línea) o
+     $$expresión$$ (bloque). La sintaxis es LaTeX estándar.",
+    title = "Cómo insertar ecuaciones",
+    type  = "info"
+  )
+)
+```

@@ -1,0 +1,31 @@
+Package: navreport
+Type: Package
+Title: Multi-Level Navigation R Markdown Template with Lazy Chart Loading
+Version: 0.1.0
+Authors@R: person("Diego", "Analista", email = "autor@correo.com", role = c("aut", "cre"))
+Description: Provides an R Markdown output format that renders HTML documents
+    with an unlimited-depth sidebar navigation, lazy-loaded interactive charts,
+    and a professional academic/business aesthetic. Supports highcharter,
+    plotly, echarts4r, and ggplot2 (via ggplotly). Charts are deferred until
+    the user navigates to their page, enabling documents with hundreds of
+    charts to open in under 10 seconds.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 4.0.0)
+Imports:
+    rmarkdown (>= 2.20),
+    htmltools (>= 0.5.5),
+    jsonlite (>= 1.8.0),
+    knitr (>= 1.40)
+Suggests:
+    highcharter (>= 0.9.4),
+    plotly (>= 4.10.0),
+    echarts4r (>= 0.4.4),
+    ggplot2 (>= 3.4.0),
+    DT (>= 0.26),
+    dplyr
+RoxygenNote: 7.2.3
+VignetteBuilder: knitr
+URL: https://github.com/TU_USUARIO/navreport
+BugReports: https://github.com/TU_USUARIO/navreport/issues
