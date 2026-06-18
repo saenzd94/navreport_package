@@ -80,7 +80,15 @@ navreport_html <- function(
     "https://fonts.googleapis.com/css2?family=%s:wght@400;700&family=%s:wght@300;400;500;600;700&display=swap",
     gsub(" ", "+", hfont), gsub(" ", "+", bfont)
   )
-  fonts_link <- sprintf('<link rel="preconnect" href="https://fonts.googleapis.com">\n<link href="%s" rel="stylesheet">\n', gfonts_url)
+  # Nota: se omite deliberadamente el <link rel="preconnect" ...> que
+  # solía incluirse aqui. Es solo una sugerencia de rendimiento para el
+  # navegador (adelantar la conexion TCP/TLS); no es un recurso real.
+  # Pandoc, al generar el documento self-contained, intenta DESCARGAR
+  # cualquier <link href="..."> que encuentra para embeberlo, sin
+  # distinguir rel="preconnect" de rel="stylesheet". Como la URL del
+  # preconnect es el dominio sin ruta, la descarga falla con 404 y
+  # produce una advertencia inofensiva pero confusa en el log de knit.
+  fonts_link <- sprintf('<link href="%s" rel="stylesheet">\n', gfonts_url)
 
   # ── Logo meta ─────────────────────────────────────────────────────────────
   logo_meta <- if (!is.null(logo)) {
