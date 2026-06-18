@@ -87,8 +87,20 @@ fn_nav <- function(..., title = "Dashboard", subtitle = NULL,
     nav_json
   )
 
-  cat(shell_html)
+  cat(.strip_html_indent(shell_html))
   invisible(NULL)
+}
+
+# Strip leading whitespace from each line of an HTML string before emitting
+# it into the Markdown stream. This is REQUIRED: CommonMark (the syntax
+# Pandoc parses) treats any line indented by 4+ spaces as an indented code
+# block rather than raw HTML, which would otherwise silently escape and
+# <pre><code>-wrap deeply nested tags (anything past 1-2 nesting levels in
+# a readably-indented HTML template). Stripping indentation is purely
+# cosmetic for the generated HTML — it does not affect the DOM structure,
+# only how the source characters line up — so this is always safe.
+.strip_html_indent <- function(html_str) {
+  gsub("(?m)^[ \t]+", "", html_str, perl = TRUE)
 }
 
 # ── Navigation tree builders ──────────────────────────────────────────────
