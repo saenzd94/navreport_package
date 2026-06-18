@@ -32,7 +32,7 @@ Template de R Markdown con **navegación lateral multinivel** y **carga diferida
 install.packages("devtools")
 
 # Instalar navreport
-devtools::install_github("saenzd94/navreport")
+devtools::install_github("saenzd94/navreport_package")
 ```
 
 ### Opción B — Instalación local (sin GitHub)
