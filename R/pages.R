@@ -174,8 +174,38 @@ fn_ec <- function(ec, height = "420px", width = "100%") {
     }
   )
 
+  # ── Dependencias JS del widget (CRÍTICO) ────────────────────────────────
+  # Al serializar el widget a JSON manualmente, se PIERDEN sus dependencias
+  # (la librería Highcharts, plotly, etc.). Sin ellas, window.Highcharts no
+  # existe en el navegador y el gráfico nunca se dibuja (spinner infinito).
+  # Aquí se recolectan esas dependencias y se adjuntan al tagList que se
+  # devuelve: knitr/rmarkdown las detecta y las embebe UNA vez en el
+  # documento (htmltools deduplica si el mismo widget aparece muchas veces),
+  # de modo que la librería esté disponible globalmente cuando el JS de
+  # navreport llame a Highcharts.chart() al navegar a la página.
+  deps <- tryCatch(
+    htmlwidgets::getDependency(
+      name    = switch(type,
+                       highcharts = "highchart",
+                       plotly     = "plotly",
+                       echarts    = "echarts4r",
+                       type),
+      package = switch(type,
+                       highcharts = "highcharter",
+                       plotly     = "plotly",
+                       echarts    = "echarts4r",
+                       NULL)
+    ),
+    error = function(e) NULL
+  )
+  # Respaldo: si getDependency no funcionó, tomar las dependencias que el
+  # propio objeto widget trae adjuntas (widget$dependencies).
+  if (is.null(deps) || length(deps) == 0) {
+    deps <- widget$dependencies
+  }
+
   # Produce a placeholder div + the data script
-  htmltools::tagList(
+  bloque <- htmltools::tagList(
     htmltools::div(
       id    = uid,
       class = paste0("nr-lazy-chart nr-lazy-", type),
@@ -198,6 +228,12 @@ fn_ec <- function(ec, height = "420px", width = "100%") {
       htmltools::HTML(widget_json)
     )
   )
+
+  # Adjuntar las dependencias al bloque para que se embeban en el documento.
+  if (!is.null(deps) && length(deps) > 0) {
+    bloque <- htmltools::attachDependencies(bloque, deps, append = TRUE)
+  }
+  bloque
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -312,16 +348,26 @@ fn_text_chart <- function(text, chart, layout = "side", text_width = "35%") {
 #  (avoids pulling in commonmark/pandoc for simple formatting)
 # ══════════════════════════════════════════════════════════════════════════════
 .md_lite <- function(txt) {
-  txt <- gsub("^## (.+)$",  "<h3>\\1</h3>",      txt, perl = TRUE)
-  txt <- gsub("^### (.+)$", "<h4>\\1</h4>",      txt, perl = TRUE)
+  # Inline (negrita, cursiva, código) — se aplican sobre todo el texto.
   txt <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", txt, perl = TRUE)
   txt <- gsub("\\*(.+?)\\*",       "<em>\\1</em>",          txt, perl = TRUE)
   txt <- gsub("`(.+?)`",            "<code>\\1</code>",      txt, perl = TRUE)
-  # Wrap non-tag lines in <p>
-  lines <- strsplit(txt, "\n")[[1]]
+
+  # Encabezados y párrafos — se procesan LÍNEA POR LÍNEA. El bug anterior
+  # era usar "^## ...$" sobre el texto completo sin modo multilínea: ^ y $
+  # solo coincidían con el inicio/fin de TODO el texto, así que un "## " que
+  # no estuviera en la primerísima posición (o con más texto después) nunca
+  # se convertía y se mostraba literal. Procesar línea por línea lo evita.
+  lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
   out <- vapply(lines, function(l) {
-    if (grepl("^<[h|ul|ol|li|p|div|table]", trimws(l)) || trimws(l) == "") l
-    else paste0("<p>", l, "</p>")
-  }, character(1))
+    lt <- trimws(l)
+    if (lt == "") return("")
+    if (grepl("^### ", lt)) return(paste0("<h4>", sub("^### ", "", lt), "</h4>"))
+    if (grepl("^## ",  lt)) return(paste0("<h3>", sub("^## ",  "", lt), "</h3>"))
+    if (grepl("^# ",   lt)) return(paste0("<h2>", sub("^# ",   "", lt), "</h2>"))
+    # Si la línea ya es una etiqueta de bloque HTML, dejarla tal cual.
+    if (grepl("^<(h[1-6]|ul|ol|li|p|div|table|blockquote)", lt)) return(l)
+    paste0("<p>", l, "</p>")
+  }, character(1), USE.NAMES = FALSE)
   paste(out, collapse = "\n")
 }

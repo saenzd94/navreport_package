@@ -99,6 +99,25 @@ navreport_html <- function(
   tmp_header <- tempfile(fileext = ".html")
   writeLines(in_header_str, tmp_header)
 
+  # ── Envolver el motor JS en <script> ─────────────────────────────────────
+  # rmarkdown inserta el archivo de after_body como TEXTO CRUDO en el body,
+  # sin envolverlo en <script>. Por eso el .js debe entregarse ya envuelto.
+  # Además, el comentario de cabecera de navreport.js menciona literalmente
+  # la cadena <script type="text/nr-deferred"> (al explicar la estrategia de
+  # carga diferida). Dentro de un bloque <script>, el parser HTML corta en la
+  # primera secuencia "</script" y CUALQUIER "<script" o "</script" literal
+  # rompe el anidamiento, dejando el motor NR atrapado y sin ejecutarse. Se
+  # neutralizan esas secuencias partiéndolas con una concatenación inocua
+  # ("<scr"+"ipt") que es idéntica como texto JS pero invisible al parser HTML.
+  js_code <- paste(readLines(js_main, warn = FALSE), collapse = "\n")
+  js_code <- gsub("</script", "<\\\\/script", js_code, fixed = FALSE)   # cierre seguro en comentarios/strings
+  js_code <- gsub("<script",  "<scr\" + \"ipt", js_code, fixed = TRUE)  # apertura literal en comentarios
+  # (las dos líneas anteriores solo afectan texto dentro de comentarios o
+  #  cadenas; el motor NR no contiene <script> ejecutable como código.)
+
+  tmp_js <- tempfile(fileext = ".html")
+  writeLines(c("<script type=\"text/javascript\">", js_code, "</script>"), tmp_js)
+
   # ── Build output format ───────────────────────────────────────────────────
   fmt <- rmarkdown::html_document(
     theme          = NULL,
@@ -106,7 +125,7 @@ navreport_html <- function(
     css            = c(tmp_vars_css, css_main),
     includes       = rmarkdown::includes(
       in_header  = tmp_header,
-      after_body = js_main
+      after_body = tmp_js
     ),
     mathjax        = if (!is.null(mathjax) && mathjax == "cdn")
       "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" else mathjax,
