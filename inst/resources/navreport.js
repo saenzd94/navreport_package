@@ -148,8 +148,11 @@
         el.classList.remove('nr-page-enter');
       });
 
-      // Show target
-      var target = document.querySelector('[data-page-id="' + pageId + '"]');
+      // Show target — IMPORTANTE: hay que acotar a '.nr-page', porque los
+      // botones del menú TAMBIÉN llevan data-page-id; sin el prefijo
+      // '.nr-page' el selector tomaría el botón (que aparece antes en el
+      // DOM) en vez de la página, y la página nunca se mostraría.
+      var target = document.querySelector('.nr-page[data-page-id="' + pageId + '"]');
       if (target) {
         target.style.display = 'block';
         // Trigger reflow for animation
@@ -198,40 +201,86 @@
     initPage: function (pageId) {
       if (NR.initialized[pageId]) return;
 
-      var page = document.querySelector('[data-page-id="' + pageId + '"]');
+      var page = document.querySelector('.nr-page[data-page-id="' + pageId + '"]');
       if (!page) return;
 
-      // 1. Activate htmlwidget scripts
-      page.querySelectorAll('script[type="text/nr-deferred"]').forEach(function (s) {
-        s.setAttribute('type', 'application/json');
-      });
-
-      // 2. Let HTMLWidgets render any newly activated scripts
-      if (window.HTMLWidgets && typeof HTMLWidgets.staticRender === 'function') {
-        try { HTMLWidgets.staticRender(); } catch (e) { console.warn('HTMLWidgets.staticRender error', e); }
-      }
-
-      // 3. Highcharts direct init (fallback / for fn_hc lazy path)
-      page.querySelectorAll('.nr-lazy-highcharts[data-initialized="false"]').forEach(function (div) {
-        NR.initHighchart(div);
-      });
-
-      // 4. Hide spinners
-      page.querySelectorAll('.nr-chart-spinner').forEach(function (sp) {
-        setTimeout(function () { sp.classList.add('hidden'); }, 400);
-      });
-
+      NR.initWidgetsIn(page);
       NR.initialized[pageId] = true;
     },
 
+    /* ── Initialise every lazy widget inside a container ─────────────
+       Reutilizable tanto para una página completa como para un panel
+       del chart-picker. Maneja dos tipos de widget:
+         • highcharts (vía fn_hc): el <script type="text/nr-deferred">
+           es HERMANO del div .nr-lazy-chart y lleva el mismo
+           data-chart-id; su contenido es un string JSON doblemente
+           codificado cuya config real está en la clave "hc_opts".
+         • otros htmlwidgets (plotly, etc.): se activan cambiando el
+           type del script a "application/json" y llamando a
+           HTMLWidgets.staticRender().                                  */
+    initWidgetsIn: function (container) {
+      if (!container) return;
+
+      // ── 1. Gráficos highcharter (fn_hc) ──────────────────────────
+      container.querySelectorAll('.nr-lazy-highcharts[data-initialized="false"]').forEach(function (div) {
+        NR.initHighchart(div);
+      });
+
+      // ── 2. Otros htmlwidgets: activar y dejar que HTMLWidgets los
+      //       renderice. Se excluyen los scripts de highcharts, que ya
+      //       se inicializaron arriba por su cuenta. ─────────────────
+      var activados = false;
+      container.querySelectorAll('script[type="text/nr-deferred"]').forEach(function (s) {
+        if (s.getAttribute('data-type') === 'highcharts') return;  // ya manejado
+        s.setAttribute('type', 'application/json');
+        activados = true;
+      });
+      if (activados && window.HTMLWidgets && typeof HTMLWidgets.staticRender === 'function') {
+        try { HTMLWidgets.staticRender(); } catch (e) { console.warn('HTMLWidgets.staticRender error', e); }
+      }
+
+      // ── 3. Ocultar spinners de los gráficos ya inicializados ─────
+      container.querySelectorAll('.nr-chart-spinner').forEach(function (sp) {
+        setTimeout(function () { sp.classList.add('hidden'); }, 300);
+      });
+    },
+
     initHighchart: function (div) {
-      var scriptEl = div.querySelector('script[type="application/json"]');
-      if (!scriptEl || !window.Highcharts) return;
+      if (!window.Highcharts) { console.warn('navreport: Highcharts no disponible'); return; }
+      // El <script> con la config es HERMANO del div y comparte data-chart-id.
+      var cid = div.getAttribute('data-chart-id');
+      var scriptEl = document.querySelector(
+        'script[data-chart-id="' + cid + '"][data-type="highcharts"]'
+      );
+      // Respaldo: algunos navegadores ya cambiaron el type a application/json
+      if (!scriptEl) {
+        scriptEl = document.querySelector('script[data-chart-id="' + cid + '"]');
+      }
+      if (!scriptEl) { console.warn('navreport: no se encontró config para', cid); return; }
+
       try {
-        var cfg = JSON.parse(scriptEl.textContent || scriptEl.innerText);
+        var raw = scriptEl.textContent || scriptEl.innerText;
+        // highcharter serializa como STRING JSON (doblemente codificado):
+        // primero se parsea el string exterior, y el resultado es a su vez
+        // un objeto con la clave hc_opts que contiene la config real.
+        var parsed = JSON.parse(raw);
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        var cfg = parsed.hc_opts ? parsed.hc_opts : parsed;
+
+        // Aplicar tema si highcharter lo incluyó por separado
+        if (parsed.theme && typeof Highcharts.merge === 'function') {
+          cfg = Highcharts.merge(parsed.theme, cfg);
+        }
+
         Highcharts.chart(div.id, cfg);
         div.setAttribute('data-initialized', 'true');
-      } catch (e) { console.warn('Highcharts init error', e); }
+
+        // Ocultar el spinner de ESTE gráfico
+        var sp = div.querySelector('.nr-chart-spinner');
+        if (sp) sp.classList.add('hidden');
+      } catch (e) {
+        console.warn('navreport: error al inicializar Highchart', cid, e);
+      }
     },
 
     /* ── Chart picker ───────────────────────────────────────────── */
@@ -239,19 +288,9 @@
       document.querySelectorAll('[data-picker-id="' + pickerId + '"]').forEach(function (p) {
         p.style.display = p.id === panelId ? 'block' : 'none';
       });
-      // Init widgets in newly visible panel
-      var panel = document.getElementById(panelId);
-      if (panel) {
-        if (window.HTMLWidgets) {
-          panel.querySelectorAll('script[type="text/nr-deferred"]').forEach(function (s) {
-            s.setAttribute('type', 'application/json');
-          });
-          try { HTMLWidgets.staticRender(); } catch (e) {}
-        }
-        panel.querySelectorAll('.nr-chart-spinner').forEach(function (sp) {
-          setTimeout(function () { sp.classList.add('hidden'); }, 400);
-        });
-      }
+      // Inicializar los widgets del panel recién mostrado (mismo mecanismo
+      // que initPage, reutilizado para no duplicar lógica).
+      NR.initWidgetsIn(document.getElementById(panelId));
     },
 
     /* ── Sidebar toggle ─────────────────────────────────────────── */
