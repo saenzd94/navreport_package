@@ -126,12 +126,13 @@
     },
 
     expandParents: function (el) {
-      var p = el.parentElement;
+      var p = el ? el.parentElement : null;
       while (p) {
-        if (p.classList.contains('nr-nav-children')) {
+        if (p.classList && p.classList.contains('nr-nav-children')) {
           p.classList.add('open');
+          // El botón que controla este submenú es el hermano anterior del <ul>
           var prevBtn = p.previousElementSibling;
-          if (prevBtn) prevBtn.classList.add('open');
+          if (prevBtn && prevBtn.classList) prevBtn.classList.add('open');
         }
         if (p.id === 'nr-nav-tree') break;
         p = p.parentElement;
