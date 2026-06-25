@@ -286,7 +286,12 @@
 
     /* ── Chart picker ───────────────────────────────────────────── */
     switchPicker: function (pickerId, panelId) {
-      document.querySelectorAll('[data-picker-id="' + pickerId + '"]').forEach(function (p) {
+      // IMPORTANTE: solo alternar los PANELES (.nr-picker-panel), no el
+      // contenedor exterior .nr-chart-picker, que también lleva el mismo
+      // data-picker-id. Sin acotar a .nr-picker-panel, el contenedor (que no
+      // coincide con panelId) recibía display:none y ocultaba TODO el picker
+      // — incluido el selector y el gráfico recién elegido.
+      document.querySelectorAll('.nr-picker-panel[data-picker-id="' + pickerId + '"]').forEach(function (p) {
         p.style.display = p.id === panelId ? 'block' : 'none';
       });
       // Inicializar los widgets del panel recién mostrado (mismo mecanismo
