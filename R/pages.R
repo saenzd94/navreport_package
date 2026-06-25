@@ -112,10 +112,36 @@ fn_kpi <- function(label, value, sub = NULL, color = "default") {
 #' @param hc A \code{highchart} object from the highcharter package.
 #' @param height CSS height string (default "400px").
 #' @param width CSS width string (default "100%").
+#' @param data_table Logical. Si TRUE (por defecto), habilita el menú de
+#'   exportación de Highcharts con la opción nativa "Ver tabla de datos"
+#'   (toggle dentro del propio gráfico), evitando tener que dibujar una
+#'   tabla separada debajo. Poner FALSE para gráficos donde no aplique
+#'   (ej. un pie donde la tabla no aporta).
 #' @export
-fn_hc <- function(hc, height = "420px", width = "100%") {
+fn_hc <- function(hc, height = "420px", width = "100%", data_table = TRUE) {
   if (!requireNamespace("highcharter", quietly = TRUE))
     stop("Package 'highcharter' is required for fn_hc().")
+
+  # Habilitar el menú de exportación con la opción nativa de tabla de datos.
+  # Esto reemplaza la práctica de dibujar una kable debajo de cada gráfico:
+  # el usuario alterna gráfico/tabla desde el propio menú (icono ☰), y de
+  # paso obtiene descarga a PNG/SVG/CSV/XLS. Requiere los módulos
+  # exporting.js y export-data.js de Highcharts, que se incluyen con las
+  # dependencias de highcharter.
+  if (isTRUE(data_table)) {
+    hc <- highcharter::hc_exporting(
+      hc,
+      enabled = TRUE,
+      buttons = list(contextButton = list(
+        menuItems = list(
+          "viewFullscreen", "separator",
+          "downloadPNG", "downloadSVG", "downloadCSV", "downloadXLS",
+          "separator", "viewData"   # ← "Ver tabla de datos" (toggle)
+        )
+      ))
+    )
+  }
+
   .lazy_widget(hc, type = "highcharts", height = height, width = width)
 }
 
@@ -202,6 +228,26 @@ fn_ec <- function(ec, height = "420px", width = "100%") {
   # propio objeto widget trae adjuntas (widget$dependencies).
   if (is.null(deps) || length(deps) == 0) {
     deps <- widget$dependencies
+  }
+
+  # ── Módulos de exportación de Highcharts ────────────────────────────────
+  # exporting.js + export-data.js habilitan el menú ☰ con descarga y la
+  # opción nativa "Ver tabla de datos" (viewData). No vienen en las
+  # dependencias base de highcharter, así que se adjuntan explícitamente
+  # desde los archivos que el paquete highcharter ya trae instalados. Así
+  # el toggle gráfico/tabla funciona sin conexión (documento self-contained).
+  if (identical(type, "highcharts")) {
+    hc_lib <- system.file("htmlwidgets/lib/highcharts/modules", package = "highcharter")
+    mods_exist <- file.exists(file.path(hc_lib, c("exporting.js", "export-data.js")))
+    if (nzchar(hc_lib) && all(mods_exist)) {
+      dep_export <- htmltools::htmlDependency(
+        name    = "highcharts-exporting",
+        version = "1.0.0",
+        src     = hc_lib,
+        script  = c("exporting.js", "export-data.js")
+      )
+      deps <- c(deps, list(dep_export))
+    }
   }
 
   # Produce a placeholder div + the data script
